@@ -314,19 +314,33 @@ class Game:
 
         # move restrictions according to unit type
 
-        if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
+        if not self.is_valid_coord(coords.src) or not self.is_valid_coord(
+                coords.dst) or not coords.dst in Coord.iter_adjacent(coords.src) or self.is_empty(coords.src):
             return False
         unit = self.get(coords.src)
-        #3 types for attacker cannot move right or down
-        if (unit.player is Player.Attacker) and (
-                unit.type == UnitType.AI or unit.type == UnitType.Firewall or unit.type == UnitType.Program):
-            if (coords.src.col < coords.dst.col) or (coords.src.row < coords.dst.row):
+        if (self.is_empty(coords.dst)):
+            if unit is not None:
+                if (unit.player is Player.Attacker) and (
+                        unit.type == UnitType.AI or unit.type == UnitType.Firewall or unit.type == UnitType.Program):
+                    if (coords.src.col < coords.dst.col) or (coords.src.row < coords.dst.row):
+                        return False
+                if (unit.player is Player.Defender) and (
+                        unit.type == UnitType.AI or unit.type == UnitType.Firewall or unit.type == UnitType.Program):
+                    if (coords.src.col > coords.dst.col) or (coords.src.row > coords.dst.row):
+                        return False
+
+            else:
+                return True
+        else:
+            if (self.get(coords.src).player is Player.Attacker and self.get(
+                    coords.dst).player is Player.Attacker) or ((self.get(
+                coords.src).player is Player.Defender and self.get(
+                coords.dst).player is Player.Defender) and self.get(coords.src).type != UnitType.Tech):
                 return False
-        #3 types for defender cannot move left or up
-        if (unit.player is Player.Defender) and (
-                unit.type == UnitType.AI or unit.type == UnitType.Firewall or unit.type == UnitType.Program):
-            if (coords.src.col > coords.dst.col) or (coords.src.row > coords.dst.row):
-                return False
+            else:
+
+                return True
+        # if the src not empty and has a unit -- validate type of unit first and decide if it's a valide move according to type
 
         if unit is None or unit.player != self.next_player:
             return False
@@ -335,30 +349,39 @@ class Game:
 
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
-        if self.is_valid_move(coords):
+        # dst is empty
+        if self.is_valid_move(coords) and self.is_empty(coords.dst):
             self.set(coords.dst, self.get(coords.src))
             self.set(coords.src, None)
             return (True, "")
-        # attack/combat
-        if not self.is_valid_move(coords):
-            if (not self.is_empty(coords.dst)):
-                #calculating the bi-directional damage
+        # dst is not empty attack or repair
+
+        if self.is_valid_move(coords):
+            # not tech -> not repair
+            if (self.get(coords.src).type != UnitType.Tech):
+                # calculate damage
                 attackerDamage = self.get(coords.src).damage_amount(self.get(coords.dst))
                 defenderDamage = self.get(coords.dst).damage_amount(self.get(coords.src))
                 if (attackerDamage >= self.get(coords.dst).health):
                     self.get(coords.dst).health = 0
                     self.remove_dead(coords.dst)
                     self.mod_health(coords.src, defenderDamage * -1)
-                    return (True, "combat! dead defender!")
+                    return (True, "combat dead defender!")
                 elif (defenderDamage >= self.get(coords.src).health):
                     self.get(coords.src).health = 0
                     self.remove_dead(coords.src)
                     self.mod_health(coords.dst, attackerDamage * -1)
-                    return (True, "combat! dead attacker!")
+                    return (True, "combat dead attacker!")
                 else:
                     self.mod_health(coords.src, defenderDamage * -1)
                     self.mod_health(coords.dst, attackerDamage * -1)
-                    return (True, "combat! we both fucked!")
+                    return (True, "combat both fucked!")
+            else:
+                if (self.get(coords.dst).health < 9):
+                    repairScore = self.get(coords.dst).repair_amount(self.get(coords.src))
+                    print(repairScore)
+                    self.mod_health(coords.dst, repairScore)
+                    return (True, "Healed")
 
         return (False, "invalid move")
 
