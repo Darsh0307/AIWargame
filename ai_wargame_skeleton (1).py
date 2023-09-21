@@ -311,9 +311,23 @@ class Game:
 
     def is_valid_move(self, coords : CoordPair) -> bool:
         """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
+
+        # move restrictions according to unit type
+
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
             return False
         unit = self.get(coords.src)
+        #3 types for attacker cannot move right or down
+        if (unit.player is Player.Attacker) and (
+                unit.type == UnitType.AI or unit.type == UnitType.Firewall or unit.type == UnitType.Program):
+            if (coords.src.col < coords.dst.col) or (coords.src.row < coords.dst.row):
+                return False
+        #3 types for defender cannot move left or up
+        if (unit.player is Player.Defender) and (
+                unit.type == UnitType.AI or unit.type == UnitType.Firewall or unit.type == UnitType.Program):
+            if (coords.src.col > coords.dst.col) or (coords.src.row > coords.dst.row):
+                return False
+
         if unit is None or unit.player != self.next_player:
             return False
         unit = self.get(coords.dst)
@@ -322,10 +336,31 @@ class Game:
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if self.is_valid_move(coords):
-            self.set(coords.dst,self.get(coords.src))
-            self.set(coords.src,None)
-            return (True,"")
-        return (False,"invalid move")
+            self.set(coords.dst, self.get(coords.src))
+            self.set(coords.src, None)
+            return (True, "")
+        # attack/combat
+        if not self.is_valid_move(coords):
+            if (not self.is_empty(coords.dst)):
+                #calculating the bi-directional damage
+                attackerDamage = self.get(coords.src).damage_amount(self.get(coords.dst))
+                defenderDamage = self.get(coords.dst).damage_amount(self.get(coords.src))
+                if (attackerDamage >= self.get(coords.dst).health):
+                    self.get(coords.dst).health = 0
+                    self.remove_dead(coords.dst)
+                    self.mod_health(coords.src, defenderDamage * -1)
+                    return (True, "combat! dead defender!")
+                elif (defenderDamage >= self.get(coords.src).health):
+                    self.get(coords.src).health = 0
+                    self.remove_dead(coords.src)
+                    self.mod_health(coords.dst, attackerDamage * -1)
+                    return (True, "combat! dead attacker!")
+                else:
+                    self.mod_health(coords.src, defenderDamage * -1)
+                    self.mod_health(coords.dst, attackerDamage * -1)
+                    return (True, "combat! we both fucked!")
+
+        return (False, "invalid move")
 
     def next_turn(self):
         """Transitions game to the next turn."""
