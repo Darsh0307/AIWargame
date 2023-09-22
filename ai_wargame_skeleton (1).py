@@ -309,15 +309,28 @@ class Game:
             target.mod_health(health_delta)
             self.remove_dead(coord)
 
-    def is_valid_move(self, coords : CoordPair) -> bool:
+    def is_valid_move(self, coords: CoordPair) -> bool:
         """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
 
-        # move restrictions according to unit type
-
+        # if coords entered are not valid or not adjacent coords return false right away
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(
                 coords.dst) or not coords.dst in Coord.iter_adjacent(coords.src) or self.is_empty(coords.src):
             return False
+
         unit = self.get(coords.src)
+        # freezing after being in combat
+        li = coords.src.iter_adjacent()
+        if (unit.type == UnitType.AI or unit.type == UnitType.Firewall or unit.type == UnitType.Program):
+            for i in li:
+                if (self.is_valid_coord(i)):
+                    if (not self.is_empty(i)):
+                        if not (self.get(i).player == self.get(coords.src).player):
+                            if coords.dst.to_string() == i.to_string():
+                                return True
+                            else:
+                                return False
+
+        # restrictions on movement directions
         if (self.is_empty(coords.dst)):
             if unit is not None:
                 if (unit.player is Player.Attacker) and (
@@ -328,14 +341,21 @@ class Game:
                         unit.type == UnitType.AI or unit.type == UnitType.Firewall or unit.type == UnitType.Program):
                     if (coords.src.col > coords.dst.col) or (coords.src.row > coords.dst.row):
                         return False
-
             else:
                 return True
         else:
-            if (self.get(coords.src).player is Player.Attacker and self.get(
+            if (self.get(coords.src).type == UnitType.AI or self.get(coords.src).type == UnitType.Tech):
+                if (self.get(coords.src).player is Player.Attacker and self.get(
+                        coords.dst).player is Player.Attacker) or ((self.get(
+                    coords.src).player is Player.Defender and self.get(
+                    coords.dst).player is Player.Defender)):
+                    return True
+
+
+            elif (self.get(coords.src).player is Player.Attacker and self.get(
                     coords.dst).player is Player.Attacker) or ((self.get(
                 coords.src).player is Player.Defender and self.get(
-                coords.dst).player is Player.Defender) and self.get(coords.src).type != UnitType.Tech):
+                coords.dst).player is Player.Defender)):
                 return False
             else:
 
@@ -347,8 +367,10 @@ class Game:
         unit = self.get(coords.dst)
         return (unit is None)
 
-    def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
+    def perform_move(self, coords: CoordPair) -> Tuple[bool, str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
+
+        print("hey")
         # dst is empty
         if self.is_valid_move(coords) and self.is_empty(coords.dst):
             self.set(coords.dst, self.get(coords.src))
@@ -357,9 +379,10 @@ class Game:
         # dst is not empty attack or repair
 
         if self.is_valid_move(coords):
-            # not tech -> not repair
-            if (self.get(coords.src).type != UnitType.Tech):
-                # calculate damage
+            print("here valid")
+            # calculate damage
+            if (self.get(coords.src).player != self.get(coords.dst).player):
+                print("here")
                 attackerDamage = self.get(coords.src).damage_amount(self.get(coords.dst))
                 defenderDamage = self.get(coords.dst).damage_amount(self.get(coords.src))
                 if (attackerDamage >= self.get(coords.dst).health):
@@ -378,7 +401,7 @@ class Game:
                     return (True, "combat both fucked!")
             else:
                 if (self.get(coords.dst).health < 9):
-                    repairScore = self.get(coords.dst).repair_amount(self.get(coords.src))
+                    repairScore = self.get(coords.src).repair_amount(self.get(coords.dst))
                     print(repairScore)
                     self.mod_health(coords.dst, repairScore)
                     return (True, "Healed")
