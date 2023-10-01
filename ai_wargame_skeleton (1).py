@@ -311,11 +311,16 @@ class Game:
 
     def is_valid_move(self, coords: CoordPair) -> bool:
         """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
-
-        # if coords entered are not valid or not adjacent coords return false right away
-        if not self.is_valid_coord(coords.src) or not self.is_valid_coord(
-                coords.dst) or not coords.dst in Coord.iter_adjacent(coords.src) or self.is_empty(coords.src):
+        
+        # Validate if the coordinates are valid and are adjacent
+        if ((not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst)) and
+                not coords.dst in coords.src.iter_adjacent()):
             return False
+        
+        # validate if the coords are valid and src is same as target  and the unit belongs to the same player
+        if (self.is_valid_coord(coords.src) and coords.src == coords.dst
+                and self.get(coords.src).player == self.next_player):
+            return True
 
         unit = self.get(coords.src)
         # freezing after being in combat
@@ -357,6 +362,10 @@ class Game:
                 coords.src).player is Player.Defender and self.get(
                 coords.dst).player is Player.Defender)):
                 return False
+
+            elif (self.get(coords.src) == self.get(coords.dst)):
+                return True
+
             else:
 
                 return True
@@ -377,6 +386,19 @@ class Game:
             self.set(coords.src, None)
             return (True, "")
         # dst is not empty attack or repair
+        if self.is_valid_move(coords):
+            print("here valid")
+            if (self.get(coords.src) == self.get(coords.dst)):
+                self.get(coords.src).health = 0
+                self.remove_dead(coords.src)
+                vicinity = coords.src.iter_range(1)
+                for i in vicinity:
+                    vic_unit = self.get(i)
+                    if vic_unit is not None:
+                        vic_unit.mod_health(-2)
+                        if vic_unit.health <= 0:
+                            self.remove_dead(i)
+                return (True, "Self destructed")
 
         if self.is_valid_move(coords):
             print("here valid")
